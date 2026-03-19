@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src https://www.omdbapi.com https://fonts.googleapis.com https://fonts.gstatic.com;">
+  <title>Filmoteka</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ZAVJESA -->
+<div id="curtain" onclick="openCurtain()">
+  <div class="curtain-valance"><div class="valance-fringe"></div></div>
+  <div class="curtain-panel left"><div class="curtain-fold f1"></div><div class="curtain-fold f2"></div><div class="curtain-fold f3"></div><div class="curtain-sheen"></div><div class="curtain-fringe-bottom"></div></div>
+  <div class="curtain-panel right"><div class="curtain-fold f1"></div><div class="curtain-fold f2"></div><div class="curtain-fold f3"></div><div class="curtain-sheen"></div><div class="curtain-fringe-bottom"></div></div>
+  <div class="curtain-center-glow"></div>
+  <div class="curtain-content">
+    <div class="curtain-logo">🎬</div>
+    <div class="curtain-title">FILMOTEKA</div>
+    <div class="curtain-sub">Vaša kino kolekcija</div>
+    <div class="curtain-hint">Kliknite za ulaz</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app-hidden">
+
+  <!-- Titlebar -->
+  <div class="titlebar">
+    <div class="titlebar-drag"><span class="titlebar-icon">🎬</span><span class="titlebar-name">FILMOTEKA</span></div>
+    <div class="titlebar-stats" id="titlebar-stats"></div>
+    <div class="titlebar-controls">
+      <button class="tb-btn" onclick="api.minimize()">─</button>
+      <button class="tb-btn" id="btn-maximize" onclick="api.maximize()">□</button>
+      <button class="tb-btn close" onclick="api.close()">✕</button>
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-view="collection" onclick="setView('collection',this)"><span>🎞️</span> Kolekcija <span class="tab-count" id="count-all">0</span></button>
+      <button class="nav-tab" data-view="wishlist"    onclick="setView('wishlist',this)"><span>⭐</span> Wishlist <span class="tab-count" id="count-wish">0</span></button>
+      <button class="nav-tab" data-view="series"      onclick="setView('series',this)"><span>📺</span> Serije <span class="tab-count" id="count-series">0</span></button>
+      <button class="nav-tab" data-view="dashboard"   onclick="setView('dashboard',this)"><span>📊</span> Statistike</button>
+    </div>
+
+    <!-- Sub-filters (shown only in collection view) -->
+    <div class="nav-subfilters" id="nav-subfilters">
+      <button class="sub-tab active" data-filter="all"    onclick="setFilter('all',this)">Svi</button>
+      <button class="sub-tab"        data-filter="domaci" onclick="setFilter('domaci',this)">🏠 Domaći <span id="count-domaci">0</span></button>
+      <button class="sub-tab"        data-filter="strani" onclick="setFilter('strani',this)">🌍 Strani <span id="count-strani">0</span></button>
+    </div>
+
+    <div class="nav-search">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Pretraži..." oninput="onSearch(this.value)">
+    </div>
+
+    <div class="nav-sort">
+      <select id="sort-select" onchange="setSort(this.value)">
+        <option value="title">A → Z</option>
+        <option value="year">Godina ↓</option>
+        <option value="rating">Ocjena ↓</option>
+        <option value="myrating">Moja ocjena ↓</option>
+        <option value="date">Nedavno dodani</option>
+      </select>
+    </div>
+
+    <div class="nav-actions">
+      <button class="nav-btn" id="btn-filter-toggle" onclick="toggleFilterPanel()" title="Filteri">⚗ Filteri</button>
+      <button class="nav-btn primary" onclick="openAddModal(false)">＋ Dodaj</button>
+      <button class="nav-btn" onclick="openScanModal()">📁 Skeniraj</button>
+      <button class="nav-btn" onclick="openExportModal()">💾 Export</button>
+      <button class="nav-btn icon-btn" onclick="openSettingsModal()">⚙</button>
+    </div>
+  </nav>
+
+  <!-- Filter panel -->
+  <div id="filter-panel" class="filter-panel" style="display:none">
+    <div class="filter-section">
+      <label>Žanr</label>
+      <div class="filter-chips" id="filter-genre-chips"></div>
+    </div>
+    <div class="filter-section">
+      <label>IMDB Ocjena</label>
+      <div class="filter-range-row">
+        <input type="range" id="filter-rating-min" min="0" max="10" step="0.5" value="0" oninput="onFilterRating()">
+        <span id="filter-rating-label">Sve ocjene</span>
+      </div>
+    </div>
+    <div class="filter-section">
+      <label>Godina (od)</label>
+      <div class="filter-range-row">
+        <input type="range" id="filter-year-min" min="1900" max="2025" step="1" value="1900" oninput="onFilterYear()">
+        <span id="filter-year-label">Sve godine</span>
+      </div>
+    </div>
+    <div class="filter-section">
+      <label>Status</label>
+      <div class="filter-chips">
+        <span class="chip" data-watched="all"    onclick="setWatchedFilter('all',this)">Sve</span>
+        <span class="chip" data-watched="watched" onclick="setWatchedFilter('watched',this)">✓ Gledano</span>
+        <span class="chip" data-watched="unwatched" onclick="setWatchedFilter('unwatched',this)">○ Negledano</span>
+      </div>
+    </div>
+    <button class="nav-btn" onclick="resetFilters()" style="margin-top:4px">✕ Resetuj filtere</button>
+  </div>
+
+  <!-- Main content -->
+  <main id="main-content">
+
+    <!-- COLLECTION / WISHLIST view -->
+    <div id="view-collection">
+      <div id="shelves-container"></div>
+      <div id="empty-state" class="empty-state" style="display:none">
+        <div class="empty-icon">🎬</div>
+        <h2>Polica je prazna</h2>
+        <p>Dodajte filmove ručno ili skenirajte folder</p>
+        <button class="nav-btn primary" onclick="openAddModal(false)">＋ Dodaj film</button>
+      </div>
+    </div>
+
+    <!-- WISHLIST view -->
+    <div id="view-wishlist" style="display:none">
+      <div id="wishlist-container"></div>
+      <div id="empty-wishlist" class="empty-state" style="display:none">
+        <div class="empty-icon">⭐</div>
+        <h2>Wishlist je prazan</h2>
+        <p>Dodajte filmove koje želite pogledati</p>
+        <button class="nav-btn primary" onclick="openAddModal(true)">＋ Dodaj na wishlist</button>
+      </div>
+    </div>
+
+    <!-- SERIES view -->
+    <div id="view-series" style="display:none">
+      <div id="series-container"></div>
+      <div id="empty-series" class="empty-state" style="display:none">
+        <div class="empty-icon">📺</div>
+        <h2>Nema serija</h2>
+        <p>Dodajte TV serije u kolekciju</p>
+        <button class="nav-btn primary" onclick="openSeriesModal()">＋ Dodaj seriju</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD view -->
+    <div id="view-dashboard" style="display:none">
+      <div class="dashboard">
+        <div class="dash-stat-grid" id="dash-stats"></div>
+        <div class="dash-charts">
+          <div class="dash-card">
+            <div class="dash-card-title">📅 Filmovi po deceniji</div>
+            <div class="bar-chart" id="chart-decades"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">🎭 Top žanrovi</div>
+            <div class="bar-chart" id="chart-genres"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">⭐ Distribucija IMDB ocjena</div>
+            <div class="bar-chart" id="chart-ratings"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">🎬 Top 5 reditelja</div>
+            <div class="bar-chart" id="chart-directors"></div>
+          </div>
+          <div class="dash-card wide">
+            <div class="dash-card-title">🎲 Slučajni film večeras</div>
+            <div id="random-movie-box"></div>
+            <button class="nav-btn primary" onclick="pickRandomMovie()" style="margin-top:12px">🎲 Novi prijedlog</button>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">💾 Po hard disku</div>
+            <div class="bar-chart" id="chart-drives"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ MODAL: Dodaj / Uredi film ═══ -->
+<div class="modal-backdrop" id="modal-add" style="display:none" onclick="closeModal('modal-add',event)">
+  <div class="modal-box extra-wide">
+    <div class="modal-header">
+      <h2 id="modal-add-title">Dodaj film</h2>
+      <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-add-layout">
+      <div class="modal-add-columns">
+        <!-- Poster -->
+        <div class="poster-panel">
+          <div class="poster-preview-wrap" id="poster-preview-wrap">
+            <div class="poster-preview-empty" id="poster-preview-empty">
+              <div style="font-size:36px;margin-bottom:8px">🎬</div>
+              <div style="font-size:11px;color:var(--text2);text-align:center;line-height:1.6">Poster se automatski<br>povlači sa IMDB-a</div>
+            </div>
+            <img id="poster-preview-img" src="" alt="Poster" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px;">
+            <div class="poster-change-overlay" onclick="document.getElementById('f-poster-file').click()"><span>📷 Zamijeni</span></div>
+          </div>
+          <input type="file" id="f-poster-file" accept="image/*" style="display:none" onchange="onPosterFileChange(this)">
+          <div style="margin-top:10px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);margin-bottom:5px">URL / putanja</div>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="f-poster" placeholder="https://..." style="flex:1;font-size:12px" oninput="onPosterUrlChange(this.value)">
+              <button class="nav-btn" onclick="document.getElementById('f-poster-file').click()" style="padding:7px 10px;flex-shrink:0">📁</button>
+            </div>
+            <div id="poster-status" style="font-size:11px;margin-top:4px;min-height:16px;color:var(--text3)">IMDB automatski popunjava · ili postavi vlastitu sliku</div>
+          </div>
+        </div>
+
+        <!-- Form -->
+        <div class="form-panel">
+          <div class="omdb-search-section">
+            <label>🔎 Pretraži na IMDB</label>
+            <div class="omdb-row">
+              <input type="text" id="omdb-search-input" placeholder="Naziv filma..." onkeydown="if(event.key==='Enter')fetchOmdb()">
+              <input type="text" id="omdb-year-input" placeholder="Godina" style="width:90px">
+              <button class="nav-btn primary" onclick="fetchOmdb()" id="omdb-fetch-btn">🔍 Traži</button>
+            </div>
+            <div id="omdb-results" class="omdb-results" style="display:none"></div>
+            <div id="omdb-status" class="omdb-status"></div>
+          </div>
+
+          <div class="modal-divider">ili unesi ručno</div>
+
+          <div class="add-form-grid">
+            <div class="form-group span2"><label>Naziv *</label><input type="text" id="f-title" placeholder="Npr. Dara iz Jasenovca"></div>
+            <div class="form-group"><label>Godina</label><input type="text" id="f-year" placeholder="2020"></div>
+            <div class="form-group">
+              <label>Kategorija</label>
+              <select id="f-category">
+                <option value="strani">Strani film</option>
+                <option value="domaci">Domaći film</option>
+              </select>
+            </div>
+            <div class="form-group"><label>IMDB ocjena</label><input type="text" id="f-rating" placeholder="8.5"></div>
+            <div class="form-group">
+              <label>Moja ocjena (1-10)</label>
+              <input type="number" id="f-myrating" placeholder="–" min="1" max="10" step="1">
+            </div>
+            <div class="form-group"><label>Trajanje</label><input type="text" id="f-runtime" placeholder="152 min"></div>
+            <div class="form-group span2"><label>Lokacija / Hard disk</label><input type="text" id="f-drive" placeholder="D:\Filmovi Strani"></div>
+            <div class="form-group span2"><label>Naziv fajla</label><input type="text" id="f-filename" placeholder="Film.2020.mkv"></div>
+            <div class="form-group span2"><label>Žanr</label><input type="text" id="f-genre" placeholder="Drama, Akcija"></div>
+            <div class="form-group span2"><label>Reditelj</label><input type="text" id="f-director" placeholder="Ime Prezime"></div>
+            <div class="form-group span2"><label>Radnja</label><textarea id="f-plot" rows="3" placeholder="Kratki opis..."></textarea></div>
+            <div class="form-group span2 checkbox-group">
+              <label class="checkbox-label"><input type="checkbox" id="f-watched"> Već gledan</label>
+              <label class="checkbox-label" style="margin-left:16px"><input type="checkbox" id="f-wishlist"> ⭐ Wishlist</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <input type="hidden" id="f-imdbid">
+      <input type="hidden" id="f-poster-base64">
+
+      <div class="modal-footer">
+        <button class="nav-btn" onclick="closeModal('modal-add')">Odustani</button>
+        <button class="nav-btn primary" onclick="saveMovie()">💾 Spremi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Serija ═══ -->
+<div class="modal-backdrop" id="modal-series" style="display:none" onclick="closeModal('modal-series',event)">
+  <div class="modal-box extra-wide">
+    <div class="modal-header">
+      <h2 id="modal-series-title">Dodaj seriju</h2>
+      <button class="modal-close" onclick="closeModal('modal-series')">✕</button>
+    </div>
+    <div class="modal-add-layout">
+      <div class="modal-add-columns">
+        <div class="poster-panel">
+          <div class="poster-preview-wrap" id="s-poster-preview-wrap">
+            <div class="poster-preview-empty" id="s-poster-preview-empty"><div style="font-size:36px;margin-bottom:8px">📺</div><div style="font-size:11px;color:var(--text2);text-align:center">Poster serije</div></div>
+            <img id="s-poster-preview-img" src="" alt="Poster" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px;">
+            <div class="poster-change-overlay" onclick="document.getElementById('s-poster-file').click()"><span>📷 Zamijeni</span></div>
+          </div>
+          <input type="file" id="s-poster-file" accept="image/*" style="display:none" onchange="onSeriesPosterChange(this)">
+          <div style="margin-top:10px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);margin-bottom:5px">URL postera</div>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="s-poster" placeholder="https://..." style="flex:1;font-size:12px" oninput="onSeriesPosterUrl(this.value)">
+              <button class="nav-btn" onclick="document.getElementById('s-poster-file').click()" style="padding:7px 10px">📁</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-panel">
+          <div class="omdb-search-section">
+            <label>🔎 Pretraži seriju na IMDB</label>
+            <div class="omdb-row">
+              <input type="text" id="s-omdb-input" placeholder="Naziv serije..." onkeydown="if(event.key==='Enter')fetchSeriesOmdb()">
+              <button class="nav-btn primary" onclick="fetchSeriesOmdb()">🔍 Traži</button>
+            </div>
+            <div id="s-omdb-results" class="omdb-results" style="display:none"></div>
+            <div id="s-omdb-status" class="omdb-status"></div>
+          </div>
+          <div class="modal-divider">detalji serije</div>
+          <div class="add-form-grid">
+            <div class="form-group span2"><label>Naziv serije *</label><input type="text" id="s-title" placeholder="Breaking Bad"></div>
+            <div class="form-group"><label>Godine</label><input type="text" id="s-year" placeholder="2008–2013"></div>
+            <div class="form-group"><label>IMDB ocjena</label><input type="text" id="s-rating" placeholder="9.5"></div>
+            <div class="form-group"><label>Moja ocjena</label><input type="number" id="s-myrating" placeholder="–" min="1" max="10"></div>
+            <div class="form-group"><label>Broj sezona</label><input type="number" id="s-seasons" placeholder="5" min="1" onchange="buildSeasonInputs()"></div>
+            <div class="form-group span2"><label>Lokacija</label><input type="text" id="s-drive" placeholder="D:\Serije"></div>
+            <div class="form-group span2"><label>Žanr</label><input type="text" id="s-genre" placeholder="Drama, Triler"></div>
+            <div class="form-group span2"><label>Radnja</label><textarea id="s-plot" rows="2" placeholder="Kratki opis..."></textarea></div>
+            <div class="form-group span2 checkbox-group">
+              <label class="checkbox-label"><input type="checkbox" id="s-watched"> Kompletno odgledano</label>
+              <label class="checkbox-label" style="margin-left:16px"><input type="checkbox" id="s-watching"> Gledam trenutno</label>
+            </div>
+          </div>
+          <!-- Season progress -->
+          <div id="season-inputs-wrap" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <input type="hidden" id="s-imdbid">
+      <input type="hidden" id="s-poster-base64">
+      <div class="modal-footer">
+        <button class="nav-btn" onclick="closeModal('modal-series')">Odustani</button>
+        <button class="nav-btn primary" onclick="saveSeries()">💾 Spremi seriju</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Detalji ═══ -->
+<div class="modal-backdrop" id="modal-detail" style="display:none" onclick="closeModal('modal-detail',event)">
+  <div class="modal-box detail-box">
+    <button class="modal-close" onclick="closeModal('modal-detail')">✕</button>
+    <div id="modal-detail-content"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Skeniraj folder ═══ -->
+<div class="modal-backdrop" id="modal-scan" style="display:none" onclick="closeModal('modal-scan',event)">
+  <div class="modal-box wide">
+    <div class="modal-header"><h2>📁 Skeniraj folder</h2><button class="modal-close" onclick="closeModal('modal-scan')">✕</button></div>
+    <div class="scan-layout">
+      <div class="scan-controls">
+        <div class="form-group"><label>Folder</label><div class="folder-row"><input type="text" id="scan-path" placeholder="C:\Filmovi" readonly><button class="nav-btn" onclick="pickScanFolder()">📁</button></div></div>
+        <div class="form-group"><label>Kategorija</label><select id="scan-category"><option value="strani">Strani filmovi</option><option value="domaci">Domaći filmovi</option></select></div>
+        <div class="form-group"><label>Hard disk</label><input type="text" id="scan-drive" placeholder="D: ili External 2TB"></div>
+        <div class="scan-options">
+          <label class="checkbox-label"><input type="checkbox" id="scan-skip-existing" checked> Preskoči duplikate</label>
+          <label class="checkbox-label"><input type="checkbox" id="scan-fetch-omdb" checked> Preuzmi info sa IMDB</label>
+        </div>
+        <button class="nav-btn primary full-width" onclick="startScan()" id="scan-start-btn">🚀 Počni skeniranje</button>
+      </div>
+      <div class="scan-results">
+        <div id="scan-progress-bar" style="display:none">
+          <div class="progress-label"><span id="scan-progress-text">Skeniram...</span><span id="scan-progress-pct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="scan-progress-fill"></div></div>
+        </div>
+        <div id="scan-list" class="scan-list"></div>
+        <div class="scan-footer" id="scan-footer" style="display:none">
+          <span id="scan-summary"></span>
+          <button class="nav-btn primary" onclick="addScannedMovies()">✅ Dodaj u kolekciju</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Export ═══ -->
+<div class="modal-backdrop" id="modal-export" style="display:none" onclick="closeModal('modal-export',event)">
+  <div class="modal-box narrow">
+    <div class="modal-header"><h2>💾 Export kolekcije</h2><button class="modal-close" onclick="closeModal('modal-export')">✕</button></div>
+    <div class="settings-content">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="export-option" onclick="doExportCsv()">
+          <div class="export-icon">📊</div>
+          <div class="export-info">
+            <div class="export-title">Excel / CSV</div>
+            <div class="export-desc">Otvori u Excelu ili Google Sheets. Sadrži sve podatke o filmovima.</div>
+          </div>
+        </div>
+        <div class="export-option" onclick="doExportPdf()">
+          <div class="export-icon">📄</div>
+          <div class="export-info">
+            <div class="export-title">PDF lista</div>
+            <div class="export-desc">Lijepo formatirani PDF sa posterima, ocjenama i detaljima filmova.</div>
+          </div>
+        </div>
+        <div class="export-option" onclick="doExportJson()">
+          <div class="export-icon">🗄️</div>
+          <div class="export-info">
+            <div class="export-title">JSON backup</div>
+            <div class="export-desc">Backup cijele baze podataka. Može se uvesti u drugu instalaciju.</div>
+          </div>
+        </div>
+      </div>
+      <div id="export-status" style="margin-top:12px;font-size:13px;min-height:20px;text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Postavke ═══ -->
+<div class="modal-backdrop" id="modal-settings" style="display:none" onclick="closeModal('modal-settings',event)">
+  <div class="modal-box narrow">
+    <div class="modal-header"><h2>⚙ Postavke</h2><button class="modal-close" onclick="closeModal('modal-settings')">✕</button></div>
+    <div class="settings-content">
+      <div class="form-group">
+        <label>OMDB API ključ</label>
+        <input type="text" id="settings-apikey" placeholder="Unesite API ključ">
+        <div class="form-hint">Besplatni ključ: <a href="#" onclick="openLink('https://www.omdbapi.com/apikey.aspx')">omdbapi.com/apikey.aspx</a></div>
+      </div>
+      <div class="settings-footer">
+        <button class="nav-btn" onclick="closeModal('modal-settings')">Odustani</button>
+        <button class="nav-btn primary" onclick="saveSettings()">💾 Spremi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="renderer.js"></script>
+</body>
+</html>
